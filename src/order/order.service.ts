@@ -13,15 +13,19 @@ export class OrderService {
   ) {}
 
   async create(createOrderDto: CreateOrderDto): Promise<Order> {
-    const createdOrder = new this.orderModel({
-      order_unique_id: v4(),
-      ...createOrderDto,
-    });
-    return createdOrder.save();
+    const createdOrder = await new this.orderModel(createOrderDto).save();
+    const updateOrder = await this.orderModel
+      .findByIdAndUpdate(
+        String(createdOrder._id),
+        { order_unique_id: String(createdOrder._id) },
+        { new: true },
+      )
+      .populate('currency_type_id');
+    return updateOrder;
   }
 
   async findAll(): Promise<Order[]> {
-    return this.orderModel.find().exec();
+    return this.orderModel.find().populate('currency_type_id').exec();
   }
 
   async findOneById(id: string) {

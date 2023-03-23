@@ -5,14 +5,11 @@ export type OrderDocument = HydratedDocument<Order>;
 
 @Schema()
 export class Order {
-  @Prop({ required: true })
+  @Prop()
   order_unique_id: string;
 
   @Prop({ required: true })
   full_name: string;
-
-  @Prop()
-  email: string;
 
   @Prop({ required: true })
   phone_number: string;
@@ -23,8 +20,11 @@ export class Order {
   @Prop({ required: true })
   summa: number;
 
+  @Prop()
+  email: string;
+
   @Prop({ type: mongoose.Schema.Types.ObjectId, ref: 'CurrencyType' })
-  currency_type_id: string;
+  currency_type_id: mongoose.Schema.Types.ObjectId;
 
   @Prop()
   truck: string;

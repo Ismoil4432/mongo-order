@@ -6,14 +6,42 @@ import {
   Patch,
   Param,
   Delete,
+  Res,
 } from '@nestjs/common';
 import { AdminService } from './admin.service';
 import { CreateAdminDto } from './dto/create-admin.dto';
 import { UpdateAdminDto } from './dto/update-admin.dto';
+import { LoginAdminDto } from './dto/login-admin.dto';
+import { Response } from 'express';
+import { CookieGetter } from '../decorators/cookieGetter.decorator';
 
 @Controller('admin')
 export class AdminController {
   constructor(private readonly adminService: AdminService) {}
+
+  @Post('login')
+  async login(
+    @Body() loginUserDto: LoginAdminDto,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    return this.adminService.login(loginUserDto, res);
+  }
+
+  @Post('register')
+  async registration(
+    @Body() createUserDto: CreateAdminDto,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    return this.adminService.registration(createUserDto, res);
+  }
+
+  @Post('logout')
+  async logout(
+    @CookieGetter('refresh_token') refreshToken: string,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    return this.adminService.logout(refreshToken, res);
+  }
 
   @Post('create')
   async create(@Body() createAdminDto: CreateAdminDto) {

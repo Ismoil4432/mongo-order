@@ -1,25 +1,151 @@
-import { Injectable } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { CreateAdminDto } from './dto/create-admin.dto';
 import { UpdateAdminDto } from './dto/update-admin.dto';
 import { InjectModel } from '@nestjs/mongoose';
 import { Admin, AdminDocument } from './schemas/admin.schema';
 import { Model } from 'mongoose';
 import * as bcrypt from 'bcrypt';
+import { Response } from 'express';
+import { LoginAdminDto } from './dto/login-admin.dto';
+import { JwtService } from '@nestjs/jwt';
 
 @Injectable()
 export class AdminService {
   constructor(
     @InjectModel(Admin.name) private adminModel: Model<AdminDocument>,
+    private readonly jwtService: JwtService,
   ) {}
+
+  async login(loginUserDto: LoginAdminDto, res: Response) {
+    const { user_name, password } = loginUserDto;
+    const user = await this.adminModel.findOne({ user_name });
+    if (!user) {
+      throw new UnauthorizedException('User not registered');
+    }
+    const isMatchPass = await bcrypt.compare(password, user.hashed_password);
+    if (!isMatchPass) {
+      throw new UnauthorizedException('User not registered(pass)');
+    }
+    const tokens = await this.getTokens(user);
+    const hashed_refresh_token = await bcrypt.hash(tokens.refresh_token, 7);
+    const updatedUser = await this.adminModel.findByIdAndUpdate(
+      user.id,
+      {
+        hashed_token: hashed_refresh_token,
+      },
+      { new: true },
+    );
+    res.cookie('refresh_token', tokens.refresh_token, {
+      maxAge: 15 * 24 * 60 * 60 * 1000,
+      httpOnly: true,
+    });
+    const response = {
+      message: 'User logged in',
+      user: updatedUser,
+      tokens,
+    };
+    return response;
+  }
+
+  async registration(createAdminDto: CreateAdminDto, res: Response) {
+    const { user_name, email, password } = createAdminDto;
+    const user = await this.adminModel.findOne({ user_name });
+    const userEmail = await this.adminModel.findOne({ email });
+    if (user) {
+      throw new BadRequestException('Username already exists!');
+    }
+    if (userEmail) {
+      throw new BadRequestException('Email already registered!');
+    }
+    const hashed_password = await bcrypt.hash(password, 7);
+    const newUser = await this.adminModel.create({
+      ...createAdminDto,
+      hashed_password,
+    });
+    console.log(newUser);
+
+    const tokens = await this.getTokens(newUser);
+    const hashed_refresh_token = await bcrypt.hash(tokens.refresh_token, 7);
+    const updatedUser = await this.adminModel.findByIdAndUpdate(
+      newUser.id,
+      {
+        hashed_token: hashed_refresh_token,
+      },
+      { new: true },
+    );
+    res.cookie('refresh_token', tokens.refresh_token, {
+      maxAge: 15 * 24 * 60 * 60 * 1000,
+      httpOnly: true,
+    });
+    const response = {
+      message: 'User registered',
+      user: updatedUser,
+      tokens,
+    };
+    return response;
+  }
+
+  async logout(refreshToken: string, res: Response) {
+    const userData = await this.jwtService.verify(refreshToken, {
+      secret: process.env.REFRESH_TOKEN_KEY,
+    });
+    if (!userData) {
+      throw new ForbiddenException('User not found');
+    }
+    const updateUser = await this.adminModel.findByIdAndUpdate(
+      userData.id,
+      { hashed_token: null },
+      { new: true },
+    );
+    res.clearCookie('refresh_token');
+    const response = {
+      message: 'User logged out successfully',
+      user: updateUser,
+    };
+    return response;
+  }
 
   async create(createAdminDto: CreateAdminDto): Promise<Admin> {
     const { user_name, password } = createAdminDto;
+    const user = await this.adminModel.findOne({ user_name });
+    if (user) {
+      throw new UnauthorizedException('Username already exists');
+    }
     const hashed_password = await bcrypt.hash(password, 7);
-    const createdAdmin = new this.adminModel({
-      user_name,
+    const createdAdmin = await this.adminModel.create({
+      ...createAdminDto,
       hashed_password,
     });
-    return createdAdmin.save();
+    return createdAdmin;
+  }
+
+  async getTokens(admin: any) {
+    const jwtPayload = {
+      id: admin.id,
+      is_active: admin.is_creator,
+      is_owner: admin.is_active,
+    };
+
+    const [accessToken, refreshToken] = await Promise.all([
+      this.jwtService.signAsync(jwtPayload, {
+        secret: process.env.ACCESS_TOKEN_KEY,
+        expiresIn: process.env.ACCESS_TOKEN_TIME,
+      }),
+      this.jwtService.signAsync(jwtPayload, {
+        secret: process.env.REFRESH_TOKEN_KEY,
+        expiresIn: process.env.REFRESH_TOKEN_TIME,
+      }),
+    ]);
+
+    return {
+      access_token: accessToken,
+      refresh_token: refreshToken,
+    };
   }
 
   async findAll(): Promise<Admin[]> {
