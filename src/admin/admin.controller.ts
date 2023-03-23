@@ -7,6 +7,7 @@ import {
   Param,
   Delete,
   Res,
+  UseGuards,
 } from '@nestjs/common';
 import { AdminService } from './admin.service';
 import { CreateAdminDto } from './dto/create-admin.dto';
@@ -14,6 +15,8 @@ import { UpdateAdminDto } from './dto/update-admin.dto';
 import { LoginAdminDto } from './dto/login-admin.dto';
 import { Response } from 'express';
 import { CookieGetter } from '../decorators/cookieGetter.decorator';
+import { UpdatePasswordDto } from './dto/update-password.dto';
+import { JwtAuthGuard } from '../guards/jwt-auth.guard';
 
 @Controller('admin')
 export class AdminController {
@@ -44,15 +47,28 @@ export class AdminController {
   }
 
   @Post('create')
-  async create(@Body() createAdminDto: CreateAdminDto) {
-    return this.adminService.create(createAdminDto);
+  async create(
+    @Body() createAdminDto: CreateAdminDto,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    return this.adminService.create(createAdminDto, res);
   }
 
+  @Patch('update/password/:id')
+  async updatePassword(
+    @Param('id') id: string,
+    @Body() updatePasswordDto: UpdatePasswordDto,
+  ) {
+    return this.adminService.updatePassword(id, updatePasswordDto);
+  }
+
+  @UseGuards(JwtAuthGuard)
   @Get()
   async findAll() {
     return this.adminService.findAll();
   }
 
+  @UseGuards(JwtAuthGuard)
   @Get(':id')
   async findOneById(@Param('id') id: string) {
     return this.adminService.findOneById(id);

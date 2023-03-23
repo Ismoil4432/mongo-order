@@ -13,6 +13,7 @@ import * as bcrypt from 'bcrypt';
 import { Response } from 'express';
 import { LoginAdminDto } from './dto/login-admin.dto';
 import { JwtService } from '@nestjs/jwt';
+import { UpdatePasswordDto } from './dto/update-password.dto';
 
 @Injectable()
 export class AdminService {
@@ -67,8 +68,6 @@ export class AdminService {
       ...createAdminDto,
       hashed_password,
     });
-    console.log(newUser);
-
     const tokens = await this.getTokens(newUser);
     const hashed_refresh_token = await bcrypt.hash(tokens.refresh_token, 7);
     const updatedUser = await this.adminModel.findByIdAndUpdate(
@@ -110,18 +109,69 @@ export class AdminService {
     return response;
   }
 
-  async create(createAdminDto: CreateAdminDto): Promise<Admin> {
-    const { user_name, password } = createAdminDto;
+  async updatePassword(id: string, updatePasswordDto: UpdatePasswordDto) {
+    const { old_password, new_password, confirm_password } = updatePasswordDto;
+    let user: any;
+    try {
+      user = await this.adminModel.findById(id);
+      if (!user) {
+        throw new UnauthorizedException('User not found');
+      }
+    } catch (error) {
+      throw new UnauthorizedException('User not found');
+    }
+    const isMatchPass = await bcrypt.compare(
+      old_password,
+      user.hashed_password,
+    );
+    if (!isMatchPass) {
+      throw new UnauthorizedException('Old password is wrong');
+    }
+    if (new_password != confirm_password) {
+      throw new UnauthorizedException('Passwords do not match');
+    }
+    const hashed_password = await bcrypt.hash(new_password, 7);
+    return this.adminModel.findByIdAndUpdate(
+      id,
+      { hashed_password },
+      { new: true },
+    );
+  }
+
+  async create(createAdminDto: CreateAdminDto, res: Response) {
+    const { user_name, email, password } = createAdminDto;
     const user = await this.adminModel.findOne({ user_name });
+    const userEmail = await this.adminModel.findOne({ email });
     if (user) {
       throw new UnauthorizedException('Username already exists');
+    }
+    if (userEmail) {
+      throw new BadRequestException('Email already registered!');
     }
     const hashed_password = await bcrypt.hash(password, 7);
     const createdAdmin = await this.adminModel.create({
       ...createAdminDto,
       hashed_password,
     });
-    return createdAdmin;
+    const tokens = await this.getTokens(createdAdmin);
+    const hashed_refresh_token = await bcrypt.hash(tokens.refresh_token, 7);
+    const updatedUser = await this.adminModel.findByIdAndUpdate(
+      createdAdmin.id,
+      {
+        hashed_token: hashed_refresh_token,
+      },
+      { new: true },
+    );
+    res.cookie('refresh_token', tokens.refresh_token, {
+      maxAge: 15 * 24 * 60 * 60 * 1000,
+      httpOnly: true,
+    });
+    const response = {
+      message: 'User created',
+      user: updatedUser,
+      tokens,
+    };
+    return response;
   }
 
   async getTokens(admin: any) {
@@ -153,7 +203,16 @@ export class AdminService {
   }
 
   async findOneById(id: string) {
-    return this.adminModel.findById(id).exec();
+    let user: any;
+    try {
+      user = await this.adminModel.findById(id);
+      if (!user) {
+        throw new UnauthorizedException('User not found');
+      }
+    } catch (error) {
+      throw new UnauthorizedException('User not found');
+    }
+    return user;
   }
 
   async findOneByUserName(user_name: string): Promise<Admin> {
