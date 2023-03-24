@@ -17,6 +17,8 @@ import { Response } from 'express';
 import { CookieGetter } from '../decorators/cookieGetter.decorator';
 import { UpdatePasswordDto } from './dto/update-password.dto';
 import { JwtAuthGuard } from '../guards/jwt-auth.guard';
+import { UserSelfGuard } from '../guards/user-self.guard';
+import { AdminCreatorGuard } from './../guards/admin-creator.guard';
 
 @Controller('admin')
 export class AdminController {
@@ -38,7 +40,9 @@ export class AdminController {
     return this.adminService.registration(createUserDto, res);
   }
 
-  @Post('logout')
+  @UseGuards(UserSelfGuard)
+  @UseGuards(JwtAuthGuard)
+  @Post('logout/:id')
   async logout(
     @CookieGetter('refresh_token') refreshToken: string,
     @Res({ passthrough: true }) res: Response,
@@ -46,6 +50,8 @@ export class AdminController {
     return this.adminService.logout(refreshToken, res);
   }
 
+  @UseGuards(AdminCreatorGuard)
+  @UseGuards(JwtAuthGuard)
   @Post('create')
   async create(
     @Body() createAdminDto: CreateAdminDto,
@@ -54,6 +60,8 @@ export class AdminController {
     return this.adminService.create(createAdminDto, res);
   }
 
+  @UseGuards(UserSelfGuard)
+  @UseGuards(JwtAuthGuard)
   @Patch('update/password/:id')
   async updatePassword(
     @Param('id') id: string,
@@ -74,11 +82,14 @@ export class AdminController {
     return this.adminService.findOneById(id);
   }
 
+  @UseGuards(JwtAuthGuard)
   @Get('username/:username')
   async findOneByUserName(@Param('username') username: string) {
     return this.adminService.findOneByUserName(username);
   }
 
+  @UseGuards(UserSelfGuard)
+  @UseGuards(JwtAuthGuard)
   @Patch('update/:id')
   async update(
     @Param('id') id: string,
@@ -87,6 +98,8 @@ export class AdminController {
     return this.adminService.update(id, updateAdminDto);
   }
 
+  @UseGuards(UserSelfGuard)
+  @UseGuards(JwtAuthGuard)
   @Delete(':id')
   async remove(@Param('id') id: string) {
     return this.adminService.remove(id);

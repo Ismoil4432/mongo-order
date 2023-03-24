@@ -33,11 +33,11 @@ export class JwtAuthGuard implements CanActivate {
         message: "Foydalanuvchi avtorizatsiyadan o'tmagan",
       });
     }
-    // if (!user.is_active) {
-    //   throw new UnauthorizedException({
-    //     message: 'Foydalanuvchi avtiv emas',
-    //   });
-    // }
+    if (!user.is_active) {
+      throw new UnauthorizedException({
+        message: 'Foydalanuvchi avtiv emas',
+      });
+    }
     req.user = user;
     return true;
   }

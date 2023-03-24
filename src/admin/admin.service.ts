@@ -177,8 +177,8 @@ export class AdminService {
   async getTokens(admin: any) {
     const jwtPayload = {
       id: admin.id,
-      is_active: admin.is_creator,
-      is_owner: admin.is_active,
+      is_creator: admin.is_creator,
+      is_active: admin.is_active,
     };
 
     const [accessToken, refreshToken] = await Promise.all([
@@ -216,16 +216,38 @@ export class AdminService {
   }
 
   async findOneByUserName(user_name: string): Promise<Admin> {
-    return this.adminModel.findOne({ user_name }).exec();
+    const user = await this.adminModel.findOne({ user_name }).exec();
+    if (!user) {
+      throw new UnauthorizedException('Username not found');
+    }
+    return user;
   }
 
   async update(id: string, updateAdminDto: UpdateAdminDto) {
+    let user: any;
+    try {
+      user = await this.adminModel.findById(id);
+      if (!user) {
+        throw new UnauthorizedException('User not found');
+      }
+    } catch (error) {
+      throw new UnauthorizedException('User not found');
+    }
     return this.adminModel
       .findByIdAndUpdate(id, updateAdminDto, { new: true })
       .exec();
   }
 
   async remove(id: string) {
+    let user: any;
+    try {
+      user = await this.adminModel.findById(id);
+      if (!user) {
+        throw new UnauthorizedException('User not found');
+      }
+    } catch (error) {
+      throw new UnauthorizedException('User not found');
+    }
     return this.adminModel.findByIdAndDelete(id).exec();
   }
 }

@@ -7,17 +7,12 @@ import {
 import { Observable } from 'rxjs';
 
 @Injectable()
-export class UserSelfGuard implements CanActivate {
+export class AdminCreatorGuard implements CanActivate {
   canActivate(
     context: ExecutionContext,
   ): boolean | Promise<boolean> | Observable<boolean> {
     const req = context.switchToHttp().getRequest();
-    if (
-      !(
-        String(req.user.id) === req.user.id &&
-        (req.user.id === req.params.id || req.user.is_creator)
-      )
-    ) {
+    if (!(String(req.user.id) === req.user.id && req.user.is_creator)) {
       throw new UnauthorizedException({
         message: 'Ruxsat etilmagan foydalanuvchi',
       });
